@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111614">
+    <title>Avoid the Traffic!</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            background: #111614;
+            color: #f3f3df;
+            font-synthesis: none;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background-color: #111614;
+            background-image: radial-gradient(#35413a 0.8px, transparent 0.8px);
+            background-size: 20px 20px;
+        }
+
+        main {
+            width: min(100% - 32px, 560px);
+            margin: 0 auto;
+            padding: 32px 0 28px;
+        }
+
+        .masthead {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            color: #a9b2a7;
+            font: 700 12px/1.2 "Courier New", monospace;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .masthead span:last-child { color: #d2e45a; }
+
+        h1 {
+            margin: 0;
+            color: #f3f3df;
+            font-size: clamp(30px, 8vw, 44px);
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .intro {
+            margin: 10px 0 20px;
+            color: #a9b2a7;
+            font-size: 15px;
+        }
+
+        .game-shell {
+            position: relative;
+            width: min(100%, 400px);
+            margin: 0 auto;
+            overflow: hidden;
+            border: 2px solid #536057;
+            background: #202824;
+            box-shadow: 8px 8px 0 #080b09;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+        }
+
+        .touch-controls {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: min(100%, 400px);
+            margin: 14px auto 0;
+        }
+
+        .touch-controls button, .restart {
+            min-height: 48px;
+            border: 1px solid #79856c;
+            border-radius: 4px;
+            background: #27322c;
+            color: #f3f3df;
+            font: 700 15px "Courier New", monospace;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .touch-controls button:active, .restart:active { background: #46533e; }
+
+        .below-game {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: min(100%, 400px);
+            margin: 18px auto 0;
+        }
+
+        .below-game p {
+            margin: 0;
+            color: #a9b2a7;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        kbd {
+            padding: 3px 6px;
+            border: 1px solid #58645a;
+            border-radius: 3px;
+            background: #202824;
+            color: #f3f3df;
+            font: 700 12px "Courier New", monospace;
+        }
+
+        .restart { min-width: 104px; padding: 0 12px; }
+
+        .how-to-play {
+            width: min(100%, 400px);
+            margin: 26px auto 0;
+            padding-top: 17px;
+            border-top: 1px solid #35413a;
+        }
+
+        .how-to-play h2 {
+            margin: 0 0 10px;
+            color: #d2e45a;
+            font: 700 12px "Courier New", monospace;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .how-to-play p {
+            margin: 0;
+            color: #c5ccc2;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        @media (max-width: 600px), (pointer: coarse) {
+            main { padding-top: 22px; }
+            .touch-controls { display: grid; }
+            .below-game { margin-top: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <div class="masthead"><span>Night drive / 01</span><span>Stay in your lane</span></div>
+            <h1>Avoid the Traffic!</h1>
+            <p class="intro">One road. One rule. Don't hit the other car.</p>
+        </header>
+
+        <section class="game-shell" aria-label="Car traffic game">
+            <canvas id="gameCanvas" width="400" height="500" aria-label="Game road. Use the left and right arrow keys to steer."></canvas>
+        </section>
+
+        <div class="touch-controls" aria-label="Touch steering controls">
+            <button type="button" data-direction="left" aria-label="Steer left">&#8592; LEFT</button>
+            <button type="button" data-direction="right" aria-label="Steer right">RIGHT &#8594;</button>
+        </div>
+
+        <div class="below-game">
+            <p><kbd>&larr;</kbd> <kbd>&rarr;</kbd> to steer<br><kbd>R</kbd> to restart</p>
+            <button class="restart" id="restartButton" type="button">Restart</button>
+        </div>
+
+        <section class="how-to-play" aria-labelledby="howToPlayTitle">
+            <h2 id="howToPlayTitle">How to play</h2>
+            <p>Use the left and right arrow keys, or the buttons, to dodge the blue car. Each car you pass is worth 10 points, and the traffic gets faster as you go. Crash and the run is over. Press <kbd>R</kbd> or select Restart to take another drive.</p>
+        </section>
+    </main>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const keys = {};
+        const car = { x: 180, y: 400, width: 40, height: 70, speed: 6 };
+        const obstacle = { x: 180, y: -100, width: 40, height: 70, speed: 4 };
+        let score = 0;
+        let isGameOver = false;
+
+        function resetGame() {
+            car.x = 180;
+            obstacle.x = Math.random() * 280 + 60;
+            obstacle.y = -100;
+            obstacle.speed = 4;
+            score = 0;
+            isGameOver = false;
+        }
+
+        function setDirection(event, isPressed) {
+            const direction = event.currentTarget.dataset.direction;
+            keys[direction === "left" ? "ArrowLeft" : "ArrowRight"] = isPressed;
+        }
+
+        window.addEventListener("keydown", (event) => {
+            if (["ArrowLeft", "ArrowRight", " "].includes(event.key)) event.preventDefault();
+            keys[event.key] = true;
+            if (event.key.toLowerCase() === "r") resetGame();
+        });
+
+        window.addEventListener("keyup", (event) => { keys[event.key] = false; });
+        window.addEventListener("blur", () => {
+            keys.ArrowLeft = false;
+            keys.ArrowRight = false;
+        });
+
+        document.querySelectorAll("[data-direction]").forEach((button) => {
+            button.addEventListener("pointerdown", (event) => {
+                event.preventDefault();
+                button.setPointerCapture(event.pointerId);
+                setDirection(event, true);
+            });
+            button.addEventListener("pointerup", (event) => setDirection(event, false));
+            button.addEventListener("pointercancel", (event) => setDirection(event, false));
+            button.addEventListener("lostpointercapture", (event) => setDirection(event, false));
+        });
+
+        document.getElementById("restartButton").addEventListener("click", resetGame);
+
+        function update() {
+            if (isGameOver) return;
+
+            if (keys.ArrowLeft && car.x > 48) car.x -= car.speed;
+            if (keys.ArrowRight && car.x < canvas.width - 88) car.x += car.speed;
+            obstacle.y += obstacle.speed;
+
+            if (obstacle.y > canvas.height) {
+                obstacle.y = -100;
+                obstacle.x = Math.random() * 280 + 60;
+                obstacle.speed += 0.5;
+                score += 10;
+            }
+
+            if (
+                car.x < obstacle.x + obstacle.width &&
+                car.x + car.width > obstacle.x &&
+                car.y < obstacle.y + obstacle.height &&
+                car.y + car.height > obstacle.y
+            ) isGameOver = true;
+        }
+
+        function drawCar(vehicle, color, windshieldY) {
+            ctx.fillStyle = color;
+            ctx.fillRect(vehicle.x, vehicle.y, vehicle.width, vehicle.height);
+            ctx.fillStyle = "#f1f0d6";
+            ctx.fillRect(vehicle.x + 5, vehicle.y + windshieldY, 30, 15);
+            ctx.fillStyle = "#202824";
+            ctx.fillRect(vehicle.x - 3, vehicle.y + 12, 4, 14);
+            ctx.fillRect(vehicle.x + vehicle.width - 1, vehicle.y + 12, 4, 14);
+            ctx.fillRect(vehicle.x - 3, vehicle.y + 48, 4, 14);
+            ctx.fillRect(vehicle.x + vehicle.width - 1, vehicle.y + 48, 4, 14);
+        }
+
+        function draw() {
+            ctx.fillStyle = "#202824";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#303a34";
+            ctx.fillRect(40, 0, 320, canvas.height);
+            ctx.fillStyle = "#d2e45a";
+            ctx.fillRect(42, 0, 3, canvas.height);
+            ctx.fillRect(355, 0, 3, canvas.height);
+
+            ctx.strokeStyle = "#879184";
+            ctx.setLineDash([22, 24]);
+            ctx.lineDashOffset = -(score + (isGameOver ? 0 : performance.now() / 18)) % 46;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(200, 0);
+            ctx.lineTo(200, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            drawCar(car, "#ff684d", 15);
+            drawCar(obstacle, "#54c6d2", 40);
+
+            ctx.fillStyle = "#f3f3df";
+            ctx.font = "bold 18px 'Courier New', monospace";
+            ctx.fillText(`SCORE ${String(score).padStart(3, "0")}`, 16, 30);
+
+            if (isGameOver) {
+                ctx.fillStyle = "rgba(10, 14, 12, 0.82)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#ff684d";
+                ctx.font = "bold 34px 'Courier New', monospace";
+                ctx.fillText("WIPEOUT", canvas.width / 2, 228);
+                ctx.fillStyle = "#f3f3df";
+                ctx.font = "16px 'Courier New', monospace";
+                ctx.fillText(`FINAL SCORE  ${score}`, canvas.width / 2, 262);
+                ctx.fillText("PRESS R TO DRIVE AGAIN", canvas.width / 2, 296);
+                ctx.textAlign = "start";
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
